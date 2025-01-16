@@ -3,13 +3,14 @@
 import { ReactNode } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Files, FileText, Link, Plus } from "lucide-react"
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface PageLayoutProps {
     title: string
@@ -21,6 +22,7 @@ interface PageLayoutProps {
         description: string
         actionLabel: string
         onAction: () => void
+        icons?: React.ReactNode[]
     }
     headerAction?: {
         label: string
@@ -66,17 +68,17 @@ export function PageLayout({
                     <p>Loading...</p>
                 </div>
             ) : isEmpty && emptyState ? (
-                <div className="flex min-h-[400px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center">
-                    <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-                        <h3 className="mt-4 text-lg font-semibold">{emptyState.title}</h3>
-                        <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                            {emptyState.description}
-                        </p>
-                        <Button onClick={emptyState.onAction}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            {emptyState.actionLabel}
-                        </Button>
-                    </div>
+                <div className="w-full flex justify-center">
+                    <EmptyState
+                        title={emptyState.title}
+                        description={emptyState.description}
+                        icons={emptyState.icons || []}
+                        action={{
+                            label: emptyState.actionLabel,
+                            onClick: emptyState.onAction,
+                        }}
+                        className="w-full"
+                    />
                 </div>
             ) : (
                 children

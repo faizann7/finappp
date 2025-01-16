@@ -15,7 +15,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Pencil, Trash } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash, FileText, Link, Files } from "lucide-react"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,6 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { type Account, ACCOUNT_TYPES } from "../types"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface AccountsListProps {
     accounts: Account[]
@@ -49,6 +50,20 @@ export function AccountsList({ accounts, onEdit, onDelete }: AccountsListProps) 
             style: 'currency',
             currency: currency,
         }).format(amount)
+    }
+
+    if (accounts.length === 0) {
+        return (
+            <EmptyState
+                title="No Accounts Created"
+                description="You can add your first account to start tracking your finances."
+                icons={[FileText, Link, Files]}
+                action={{
+                    label: "Add Account",
+                    onClick: () => {/* This will be handled by the parent's empty state action */ }
+                }}
+            />
+        )
     }
 
     return (

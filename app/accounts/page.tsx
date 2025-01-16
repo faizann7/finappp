@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Wallet, Link, Files } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { PageLayout } from "@/components/page-layout"
 import { AccountForm } from "./components/account-form"
 import { AccountsList } from "./components/accounts-list"
+import { EmptyState } from "@/components/ui/empty-state"
 import { type Account } from "./types"
 
 const STORAGE_KEY = 'finance-tracker-accounts'
@@ -80,13 +81,14 @@ export default function AccountsPage() {
                 title: "No accounts added",
                 description: "Add your first account to start tracking your finances.",
                 actionLabel: "Add Account",
-                onAction: () => setIsFormOpen(true)
+                onAction: () => setIsFormOpen(true),
+                icons: [Wallet, Link, Files]
             }}
-            headerAction={{
+            headerAction={!loading && accounts.length > 0 ? {
                 label: "Add Account",
                 icon: <Plus className="mr-2 h-4 w-4" />,
                 onClick: () => setIsFormOpen(true)
-            }}
+            } : undefined}
             dialog={{
                 isOpen: isFormOpen,
                 onOpenChange: setIsFormOpen,
