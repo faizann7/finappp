@@ -60,6 +60,11 @@ export function AccountForm({ account, onSubmit, onCancel }: AccountFormProps) {
         })
     }
 
+    const handleCancel = (e: React.MouseEvent) => {
+        e.preventDefault()
+        onCancel()
+    }
+
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
@@ -147,7 +152,11 @@ export function AccountForm({ account, onSubmit, onCancel }: AccountFormProps) {
                 />
 
                 <div className="flex justify-end gap-4">
-                    <Button variant="outline" onClick={onCancel}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancel}
+                    >
                         Cancel
                     </Button>
                     <Button type="submit">
