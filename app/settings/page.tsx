@@ -1,12 +1,19 @@
-import { PageHeader } from "@/components/page-header";
+'use client'
+
+import { useState } from "react"
+import { Settings, User, Lock } from "lucide-react"
+import { PageLayout } from "@/components/page-layout"
 
 export default function SettingsPage() {
+    const [loading, setLoading] = useState(false)
+
     return (
-        <div className="space-y-6 w-full">
-            <PageHeader
-                title="Settings"
-                subtitle="Customize your app preferences and manage your account settings."
-            />
-        </div>
+        <PageLayout
+            title="Settings"
+            subtitle="Manage your preferences"
+            isLoading={loading}
+        >
+            {/* Settings content */}
+        </PageLayout>
     )
 } 

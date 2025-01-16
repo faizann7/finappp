@@ -1,23 +1,13 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Plus, PiggyBank, Wallet, Calculator } from "lucide-react"
 import { PageLayout } from "@/components/page-layout"
-import { type Budget } from "./types"
 
-const STORAGE_KEY = 'finance-tracker-budgets'
-
-export default function BudgetsPage() {
-    const [budgets, setBudgets] = useState<Budget[]>([])
+export default function BudgetPage() {
+    const [budgets, setBudgets] = useState([])
     const [isFormOpen, setIsFormOpen] = useState(false)
-    const [loading, setLoading] = useState(false)
-
-    useEffect(() => {
-        const stored = localStorage.getItem(STORAGE_KEY)
-        if (stored) {
-            setBudgets(JSON.parse(stored))
-        }
-    }, [])
+    const [loading, setLoading] = useState(true)
 
     return (
         <PageLayout
