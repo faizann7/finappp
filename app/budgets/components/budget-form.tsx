@@ -203,7 +203,7 @@ export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
                 </div>
 
                 <div className="flex justify-end gap-4">
-                    <Button variant="outline" onClick={onCancel}>
+                    <Button variant="outline" type="button" onClick={onCancel}>
                         Cancel
                     </Button>
                     <Button type="submit">
