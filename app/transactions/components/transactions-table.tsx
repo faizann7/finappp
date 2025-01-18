@@ -57,6 +57,7 @@ import { type Transaction } from "../types"
 import { type Account } from "../../accounts/types"
 import { type Category } from "../../categories/types"
 import { cn } from "@/lib/utils"
+import { Separator } from "@/components/ui/separator"
 
 // Add category colors mapping
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -88,7 +89,7 @@ export function TransactionsTable({
     const [filters, setFilters] = useState({
         dateRange: { from: null, to: null },
         accountId: "",
-        categoryId: "",
+        categoryIds: [] as string[],
         type: "",
     })
     const [sortConfig, setSortConfig] = useState({
@@ -111,7 +112,7 @@ export function TransactionsTable({
             categories.find(c => c.id === transaction.categoryId)?.name.toLowerCase().includes(searchTerm.toLowerCase())
 
         const matchesAccount = filters.accountId === "" || transaction.accountId === filters.accountId
-        const matchesCategory = filters.categoryId === "" || transaction.categoryId === filters.categoryId
+        const matchesCategory = filters.categoryIds.length === 0 || filters.categoryIds.includes(transaction.categoryId)
         const matchesType = filters.type === "" || transaction.type === filters.type
 
         const transactionDate = new Date(transaction.date)
@@ -159,7 +160,7 @@ export function TransactionsTable({
         setFilters({
             dateRange: { from: null, to: null },
             accountId: "",
-            categoryId: "",
+            categoryIds: [],
             type: "",
         })
         setDateRange({ from: null, to: null })
@@ -171,138 +172,209 @@ export function TransactionsTable({
         return categoryColors[category?.name || ""] || { bg: "bg-gray-100", text: "text-gray-800" }
     }
 
+    // Check if any filters are active
+    const isFilterActive = () => {
+        return (
+            searchTerm !== "" ||
+            filters.accountId !== "" ||
+            filters.categoryIds.length > 0 ||
+            filters.type !== "" ||
+            (dateRange.from !== null || dateRange.to !== null)
+        );
+    };
+
     return (
         <div className="space-y-4">
-            {/* Enhanced Filters */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-2">
+            {/* Filters Row */}
+            <div className="flex items-center justify-between">
+                <div className="flex flex-1 items-center space-x-2">
                     <Input
-                        placeholder="Search transactions..."
+                        placeholder="Filter transactions..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="max-w-sm"
+                        className="h-8 w-[150px] lg:w-[250px]"
                     />
+                    {/* Date Range Filter */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateRange.from ? (
+                                    dateRange.to ? (
+                                        <>
+                                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                                            {format(dateRange.to, "LLL dd, y")}
+                                        </>
+                                    ) : (
+                                        format(dateRange.from, "LLL dd, y")
+                                    )
+                                ) : (
+                                    <span>Pick a date</span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={dateRange.from}
+                                selected={{
+                                    from: dateRange.from,
+                                    to: dateRange.to,
+                                }}
+                                onSelect={(range) => {
+                                    setDateRange({
+                                        from: range?.from || null,
+                                        to: range?.to || null,
+                                    })
+                                }}
+                                numberOfMonths={2}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    {/* Account Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <Filter className="h-4 w-4" />
+                            <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                <span>Account</span>
+                                {filters.accountId && (
+                                    <>
+                                        <Separator orientation="vertical" className="mx-2 h-4" />
+                                        <Badge
+                                            variant="secondary"
+                                            className="rounded-sm px-1 font-normal"
+                                        >
+                                            {accounts.find(a => a.id === filters.accountId)?.name}
+                                        </Badge>
+                                    </>
+                                )}
+                                <ChevronDown className="ml-2 h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[300px]">
-                            <div className="p-2 space-y-4">
-                                {/* Date Range Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Date Range</label>
-                                    <div className="flex gap-2">
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full justify-start text-left font-normal"
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {dateRange.from ? (
-                                                        format(dateRange.from, "PPP")
-                                                    ) : (
-                                                        "Start date"
-                                                    )}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={dateRange.from || undefined}
-                                                    onSelect={(date) =>
-                                                        setDateRange((prev) => ({ ...prev, from: date }))
-                                                    }
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full justify-start text-left font-normal"
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {dateRange.to ? (
-                                                        format(dateRange.to, "PPP")
-                                                    ) : (
-                                                        "End date"
-                                                    )}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={dateRange.to || undefined}
-                                                    onSelect={(date) =>
-                                                        setDateRange((prev) => ({ ...prev, to: date }))
-                                                    }
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                </div>
-
-                                <DropdownMenuSeparator />
-
-                                {/* Account Filter */}
-                                <Select
-                                    value={filters.accountId}
-                                    onValueChange={(value) =>
-                                        setFilters({ ...filters, accountId: value })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Filter by account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="">All Accounts</SelectItem>
-                                        {accounts.map((account) => (
-                                            <SelectItem key={account.id} value={account.id}>
-                                                {account.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <DropdownMenuSeparator />
-
-                                {/* Type Filter */}
-                                <Select
-                                    value={filters.type}
-                                    onValueChange={(value) =>
-                                        setFilters({ ...filters, type: value })
-                                    }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Filter by type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="">All Types</SelectItem>
-                                        <SelectItem value="Income">Income</SelectItem>
-                                        <SelectItem value="Expense">Expense</SelectItem>
-                                        <SelectItem value="Transfer">Transfer</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setFilters(f => ({ ...f, accountId: "" }))}>
+                                All Accounts
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-
-                            <div className="p-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="w-full"
-                                    onClick={clearFilters}
+                            {accounts.map((account) => (
+                                <DropdownMenuItem
+                                    key={account.id}
+                                    onClick={() => setFilters(f => ({ ...f, accountId: account.id }))}
                                 >
-                                    <X className="mr-2 h-4 w-4" />
-                                    Clear Filters
-                                </Button>
-                            </div>
+                                    {account.name}
+                                </DropdownMenuItem>
+                            ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    {/* Category Filter */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                <span>Category</span>
+                                {filters.categoryIds.length > 0 && (
+                                    <>
+                                        <Separator orientation="vertical" className="mx-2 h-4" />
+                                        <div className="flex space-x-1">
+                                            {filters.categoryIds.length > 2 ? (
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="rounded-sm px-1 font-normal"
+                                                >
+
+                                                    {filters.categoryIds.length} selected
+                                                </Badge>
+                                            ) : (
+                                                filters.categoryIds.map(id => {
+                                                    const category = categories.find(c => c.id === id);
+                                                    return category ? (
+                                                        <Badge
+                                                            key={id}
+                                                            variant="secondary"
+                                                            className="rounded-sm px-1 font-normal"
+                                                        >
+                                                            {category.name}
+                                                        </Badge>
+                                                    ) : null;
+                                                })
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                                <ChevronDown className="ml-2 h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {categories.map((category) => (
+                                <DropdownMenuItem key={category.id}>
+                                    <label className="flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.categoryIds.includes(category.id)}
+                                            onChange={() => {
+                                                setFilters((prev) => {
+                                                    const newCategoryIds = prev.categoryIds.includes(category.id)
+                                                        ? prev.categoryIds.filter(id => id !== category.id)
+                                                        : [...prev.categoryIds, category.id];
+                                                    return { ...prev, categoryIds: newCategoryIds };
+                                                });
+                                            }}
+                                        />
+                                        <span className="ml-2">{category.name}</span>
+                                    </label>
+                                </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setFilters(f => ({ ...f, categoryIds: [] }))}>
+                                Clear Selection
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    {/* Type Filter */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                <span>Type</span>
+                                {filters.type && (
+                                    <>
+                                        <Separator orientation="vertical" className="mx-2 h-4" />
+                                        <Badge
+                                            variant="secondary"
+                                            className="rounded-sm px-1 font-normal"
+                                        >
+                                            {filters.type}
+                                        </Badge>
+                                    </>
+                                )}
+                                <ChevronDown className="ml-2 h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setFilters(f => ({ ...f, type: "" }))}>
+                                All Types
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {["Income", "Expense", "Transfer"].map((type) => (
+                                <DropdownMenuItem
+                                    key={type}
+                                    onClick={() => setFilters(f => ({ ...f, type }))}
+                                >
+                                    {type}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    {/* Reset Filters */}
+                    {isFilterActive() && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="h-8 px-2 lg:px-3"
+                        >
+                            Reset
+                            <X className="ml-2 h-4 w-4" />
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -326,9 +398,7 @@ export function TransactionsTable({
                                     }
                                 >
                                     Date
-                                    {sortConfig.key === "date" && (
-                                        <ChevronsUpDown className="ml-2 h-4 w-4" />
-                                    )}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
                             <TableHead>Account</TableHead>
@@ -348,9 +418,7 @@ export function TransactionsTable({
                                     }
                                 >
                                     Amount
-                                    {sortConfig.key === "amount" && (
-                                        <ChevronsUpDown className="ml-2 h-4 w-4" />
-                                    )}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
                             <TableHead>Actions</TableHead>
