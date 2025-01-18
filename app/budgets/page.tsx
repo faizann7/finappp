@@ -2,21 +2,22 @@
 
 import { useState, useEffect } from "react"
 import { Plus, PiggyBank, Wallet, Calculator } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
 import { PageLayout } from "@/components/page-layout"
 import { BudgetForm } from "./components/budget-form"
 import { BudgetsList } from "./components/budgets-list"
 import { EmptyState } from "@/components/ui/empty-state"
+import { NotificationDemo } from "@/components/ui/success-alert-with-button"
 import { type Budget } from "./types"
 
 const STORAGE_KEY = 'finance-tracker-budgets'
 
 export default function BudgetsPage() {
-    const { toast } = useToast()
     const [budgets, setBudgets] = useState<Budget[]>([])
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [editingBudget, setEditingBudget] = useState<Budget | undefined>()
     const [loading, setLoading] = useState(true)
+    const [showSuccess, setShowSuccess] = useState(false)
+    const [successMessage, setSuccessMessage] = useState("")
 
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY)
@@ -36,18 +37,18 @@ export default function BudgetsPage() {
             saveBudgets(
                 budgets.map((b) => (b.id === budget.id ? budget : b))
             )
-            toast({
-                title: "Budget Updated",
-                description: `${budget.name} has been updated successfully.`,
-            })
+            setSuccessMessage(`${budget.name} has been updated successfully.`)
         } else {
             saveBudgets([...budgets, budget])
-            toast({
-                title: "Budget Created",
-                description: `${budget.name} has been created successfully.`,
-            })
+            setSuccessMessage(`${budget.name} has been created successfully.`)
         }
+        setShowSuccess(true)
         handleClose()
+
+        // Auto-dismiss the success message after 2 seconds
+        setTimeout(() => {
+            setShowSuccess(false)
+        }, 2000);
     }
 
     const handleEdit = (budget: Budget) => {
@@ -59,10 +60,13 @@ export default function BudgetsPage() {
         const budgetToDelete = budgets.find(b => b.id === budgetId)
         if (budgetToDelete) {
             saveBudgets(budgets.filter((b) => b.id !== budgetId))
-            toast({
-                title: "Budget Deleted",
-                description: `${budgetToDelete.name} has been deleted.`,
-            })
+            setSuccessMessage(`${budgetToDelete.name} has been deleted.`)
+            setShowSuccess(true)
+
+            // Auto-dismiss the success message after 2 seconds
+            setTimeout(() => {
+                setShowSuccess(false)
+            }, 2000);
         }
     }
 
@@ -108,6 +112,9 @@ export default function BudgetsPage() {
                 )
             }}
         >
+            {showSuccess && (
+                <NotificationDemo message={successMessage} onClose={() => setShowSuccess(false)} />
+            )}
             <BudgetsList
                 budgets={budgets}
                 onEdit={handleEdit}

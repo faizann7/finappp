@@ -1,32 +1,209 @@
 'use client'
 
-import { useState } from "react"
-import { PieChart, BarChart3, LineChart, Plus, Wallet, Banknote, Coins } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
 import { PageLayout } from "@/components/page-layout"
+import { TransactionForm } from "./components/transaction-form"
+import { DataTable } from "@/components/ui/data-table"
+import { useToast } from "@/hooks/use-toast"
+import { type Transaction } from "./types"
+import { type Account } from "../accounts/types"
+import { type Category } from "../categories/types"
+import { type Budget } from "../budgets/types"
+import { Plus, Wallet, Receipt, CreditCard } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { format } from "date-fns"
+import { TransactionsTable } from "./components/transactions-table"
+
+const STORAGE_KEY = 'finance-tracker-transactions'
+const ACCOUNTS_KEY = 'finance-tracker-accounts'
+const CATEGORIES_KEY = 'finance-tracker-categories'
+const BUDGETS_KEY = 'finance-tracker-budgets'
 
 export default function TransactionsPage() {
+    const { toast } = useToast()
+    const [transactions, setTransactions] = useState<Transaction[]>([])
+    const [accounts, setAccounts] = useState<Account[]>([])
+    const [categories, setCategories] = useState<Category[]>([])
+    const [budgets, setBudgets] = useState<Budget[]>([])
     const [isFormOpen, setIsFormOpen] = useState(false)
-    const [transactions, setTransactions] = useState([]) // Add your transactions state
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>()
+    const [deletingTransaction, setDeletingTransaction] = useState<Transaction | undefined>()
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const loadData = () => {
+            const storedTransactions = localStorage.getItem(STORAGE_KEY)
+            const storedAccounts = localStorage.getItem(ACCOUNTS_KEY)
+            const storedCategories = localStorage.getItem(CATEGORIES_KEY)
+            const storedBudgets = localStorage.getItem(BUDGETS_KEY)
+
+            if (storedTransactions) setTransactions(JSON.parse(storedTransactions))
+            if (storedAccounts) setAccounts(JSON.parse(storedAccounts))
+            if (storedCategories) setCategories(JSON.parse(storedCategories))
+            if (storedBudgets) setBudgets(JSON.parse(storedBudgets))
+
+            setLoading(false)
+        }
+
+        loadData()
+    }, [])
+
+    const saveTransactions = (newTransactions: Transaction[]) => {
+        setTransactions(newTransactions)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newTransactions))
+    }
+
+    const handleSubmit = (transaction: Transaction) => {
+        if (editingTransaction) {
+            saveTransactions(
+                transactions.map(t => (t.id === transaction.id ? transaction : t))
+            )
+            toast({
+                title: "Success",
+                description: "Transaction has been updated successfully.",
+            })
+        } else {
+            const newTransaction = {
+                ...transaction,
+                id: crypto.randomUUID(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            }
+            saveTransactions([...transactions, newTransaction])
+            toast({
+                title: "Success",
+                description: "Transaction has been added successfully.",
+            })
+        }
+        handleClose()
+    }
+
+    const handleEdit = (transaction: Transaction) => {
+        setEditingTransaction(transaction)
+        setIsFormOpen(true)
+    }
+
+    const handleDeleteClick = (transaction: Transaction) => {
+        setDeletingTransaction(transaction)
+    }
+
+    const handleDeleteConfirm = () => {
+        if (deletingTransaction) {
+            saveTransactions(transactions.filter((t) => t.id !== deletingTransaction.id))
+            toast({
+                title: "Success",
+                description: "Transaction has been deleted.",
+            })
+            setDeletingTransaction(undefined)
+        }
+    }
+
+    const handleDeleteCancel = () => {
+        setDeletingTransaction(undefined)
+    }
+
+    const handleClose = () => {
+        setIsFormOpen(false)
+        setEditingTransaction(undefined)
+    }
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(amount)
+    }
+
+    const getAccountName = (accountId: string) => {
+        return accounts.find(a => a.id === accountId)?.name || 'Unknown Account'
+    }
+
+    const getCategoryName = (categoryId: string) => {
+        return categories.find(c => c.id === categoryId)?.name || 'Unknown Category'
+    }
+
+    const getBudgetName = (budgetId?: string) => {
+        if (!budgetId) return undefined
+        return budgets.find(b => b.id === budgetId)?.category
+    }
 
     return (
         <PageLayout
             title="Transactions"
-            subtitle="View and manage all your financial transactions in one place"
-            isEmpty={transactions.length === 0} // Replace with actual state
+            subtitle="Track your income and expenses"
+            isLoading={loading}
+            isEmpty={transactions.length === 0}
             emptyState={{
-                title: "No transactions yet",
-                description: "Add your first transaction to start tracking your spending.",
+                title: "No transactions recorded",
+                description: "Add your first transaction to get started.",
                 actionLabel: "Add Transaction",
                 onAction: () => setIsFormOpen(true),
-                icons: [Banknote, Wallet, Coins]
+                icons: [Wallet, Receipt, CreditCard]
             }}
-            headerAction={transactions.length > 0 ? {
+            headerAction={!loading && transactions.length > 0 ? {
                 label: "Add Transaction",
                 icon: <Plus className="mr-2 h-4 w-4" />,
                 onClick: () => setIsFormOpen(true)
             } : undefined}
+            dialog={{
+                isOpen: isFormOpen,
+                onOpenChange: setIsFormOpen,
+                title: editingTransaction ? 'Edit Transaction' : 'Add Transaction',
+                content: (
+                    <TransactionForm
+                        transaction={editingTransaction}
+                        accounts={accounts}
+                        categories={categories}
+                        budgets={budgets}
+                        onSubmit={handleSubmit}
+                        onCancel={handleClose}
+                    />
+                )
+            }}
         >
-            {/* Add your transactions list component here */}
+            <TransactionsTable
+                data={transactions}
+                accounts={accounts}
+                categories={categories}
+                onEdit={handleEdit}
+                onDelete={handleDeleteClick}
+            />
+
+            <AlertDialog
+                open={!!deletingTransaction}
+                onOpenChange={(isOpen) => !isOpen && setDeletingTransaction(undefined)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this transaction? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={handleDeleteCancel}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </PageLayout>
     )
 } 

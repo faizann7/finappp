@@ -84,6 +84,11 @@ const data = {
       icon: Target,
     },
     {
+      title: "Categories",
+      url: "/categories",
+      icon: Target,
+    },
+    {
       title: "Analytics",
       url: "/analytics",
       icon: LineChart,
