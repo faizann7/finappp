@@ -396,15 +396,17 @@ export function TransactionsTable({
                                                     : "asc",
                                         })
                                     }
+                                    className="h-auto p-0 font-medium hover:bg-transparent"
                                 >
                                     Date
                                     <ChevronsUpDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </TableHead>
+                            <TableHead>Type</TableHead>
                             <TableHead>Account</TableHead>
                             <TableHead>Category</TableHead>
                             <TableHead>Description</TableHead>
-                            <TableHead>
+                            <TableHead className="text-right">
                                 <Button
                                     variant="ghost"
                                     onClick={() =>
@@ -416,6 +418,7 @@ export function TransactionsTable({
                                                     : "asc",
                                         })
                                     }
+                                    className="h-auto p-0 font-medium hover:bg-transparent ml-auto"
                                 >
                                     Amount
                                     <ChevronsUpDown className="ml-2 h-4 w-4" />
@@ -445,6 +448,11 @@ export function TransactionsTable({
                                     </TableCell>
                                     <TableCell>{format(new Date(transaction.date), "PP")}</TableCell>
                                     <TableCell>
+                                        <Badge variant="outline" className="text-foreground">
+                                            {transaction.type}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
                                         {accounts.find((a) => a.id === transaction.accountId)?.name}
                                     </TableCell>
                                     <TableCell>
@@ -453,9 +461,12 @@ export function TransactionsTable({
                                         </Badge>
                                     </TableCell>
                                     <TableCell>{transaction.description}</TableCell>
-                                    <TableCell>
-                                        <span className={`font-medium ${transaction.type === "Income" ? "text-primary-dark" : "text-red-600"}`}>
-                                            ${transaction.amount.toFixed(2)}
+                                    <TableCell className="text-right">
+                                        <span className={`font-semibold ${transaction.type === "Income"
+                                            ? "text-green-700"
+                                            : "text-black"
+                                            }`}>
+                                            {transaction.type === "Income" ? "+" : ""}${transaction.amount.toFixed(2)}
                                         </span>
                                     </TableCell>
                                     <TableCell>

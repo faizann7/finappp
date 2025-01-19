@@ -65,28 +65,41 @@ export default function TransactionsPage() {
     }
 
     const handleSubmit = (transaction: Transaction) => {
+        console.log("Submitting transaction:", transaction);
+
         if (editingTransaction) {
-            saveTransactions(
-                transactions.map(t => (t.id === transaction.id ? transaction : t))
-            )
+            const updatedTransactions = transactions.map(t => {
+                if (t.id === editingTransaction.id) {
+                    return {
+                        ...transaction,
+                        id: editingTransaction.id,
+                        updatedAt: new Date().toISOString(),
+                        createdAt: editingTransaction.createdAt,
+                    };
+                }
+                return t;
+            });
+
+            console.log("Updated transactions:", updatedTransactions);
+            saveTransactions(updatedTransactions);
             toast({
                 title: "Success",
                 description: "Transaction has been updated successfully.",
-            })
+            });
         } else {
             const newTransaction = {
                 ...transaction,
                 id: crypto.randomUUID(),
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-            }
-            saveTransactions([...transactions, newTransaction])
+            };
+            saveTransactions([...transactions, newTransaction]);
             toast({
                 title: "Success",
                 description: "Transaction has been added successfully.",
-            })
+            });
         }
-        handleClose()
+        handleClose();
     }
 
     const handleEdit = (transaction: Transaction) => {

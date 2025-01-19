@@ -227,6 +227,7 @@ export function TransactionForm({
         // Ensure subItems are properly formatted before submission
         const formattedValues = {
             ...values,
+            id: transaction?.id,
             subItems: showBreakdown ? values.subItems?.map(item => ({
                 ...item,
                 amount: Number(item.amount),
@@ -273,13 +274,38 @@ export function TransactionForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Date</FormLabel>
-                                <FormControl>
-                                    <Input type="date" {...field} />
-                                </FormControl>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                                variant="outline"
+                                                className={cn(
+                                                    "w-full pl-3 text-left font-normal",
+                                                    !field.value && "text-muted-foreground"
+                                                )}
+                                            >
+                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={(date) => {
+                                                field.onChange(date)
+                                            }}
+                                            disabled={(date) => date < new Date("1900-01-01")}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+
 
                     <FormField
                         control={form.control}
@@ -297,7 +323,7 @@ export function TransactionForm({
                                 <FormControl>
                                     <Input
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         {...field}
                                         onChange={(e) => handleAmountChange(parseFloat(e.target.value))}
                                         disabled={showBreakdown}
