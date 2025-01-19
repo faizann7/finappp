@@ -8,112 +8,56 @@ import { BudgetsList } from "./components/budgets-list"
 import { EmptyState } from "@/components/ui/empty-state"
 import { NotificationDemo } from "@/components/ui/success-alert-with-button"
 import { type Budget } from "./types"
-import { type Category } from "@/app/categories/types"
-import { SAMPLE_CATEGORIES } from "@/app/categories/types"
-import { type Transaction } from "@/app/transactions/types"
-console.log("SAMPLE_CATEGORIES:", SAMPLE_CATEGORIES); // Log to check the imported value
+import { type Category } from "../categories/types"
 
-const STORAGE_KEY = 'finance-tracker-budgets'
-const CATEGORIES_STORAGE_KEY = 'finance-tracker-categories'; // Key for categories in local storage
-const TRANSACTIONS_STORAGE_KEY = 'finance-tracker-transactions'
+const STORAGE_KEY_BUDGETS = 'finance-tracker-budgets'
+const STORAGE_KEY_CATEGORIES = 'finance-tracker-categories'
 
 export default function BudgetsPage() {
     const [budgets, setBudgets] = useState<Budget[]>([])
-    const [categories, setCategories] = useState<Category[]>([]); // Initialize as empty
+    const [categories, setCategories] = useState<Category[]>([])
     const [isFormOpen, setIsFormOpen] = useState(false)
     const [editingBudget, setEditingBudget] = useState<Budget | undefined>()
     const [loading, setLoading] = useState(true)
     const [showSuccess, setShowSuccess] = useState(false)
     const [successMessage, setSuccessMessage] = useState("")
-    const [transactions, setTransactions] = useState<Transaction[]>([])
 
     useEffect(() => {
-        // Fetch budgets from local storage
-        const storedBudgets = localStorage.getItem(STORAGE_KEY);
+        const storedBudgets = localStorage.getItem(STORAGE_KEY_BUDGETS)
         if (storedBudgets) {
-            setBudgets(JSON.parse(storedBudgets));
+            setBudgets(JSON.parse(storedBudgets))
         }
 
-        // Fetch categories from local storage
-        const storedCategories = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+        const storedCategories = localStorage.getItem(STORAGE_KEY_CATEGORIES)
         if (storedCategories) {
-            setCategories(JSON.parse(storedCategories));
-        } else {
-            // Optionally set default categories if none are found
-            setCategories(SAMPLE_CATEGORIES);
+            setCategories(JSON.parse(storedCategories))
         }
 
-        // Fetch transactions
-        const storedTransactions = localStorage.getItem(TRANSACTIONS_STORAGE_KEY)
-        if (storedTransactions) {
-            setTransactions(JSON.parse(storedTransactions))
-        }
         setLoading(false)
     }, [])
 
     const saveBudgets = (newBudgets: Budget[]) => {
         setBudgets(newBudgets)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newBudgets))
-    }
-
-    // Function to calculate spent amount for a budget
-    const calculateSpentAmount = (categoryId: string, startDate?: string, endDate?: string) => {
-        return transactions.reduce((total, transaction) => {
-            if (transaction.categoryId !== categoryId) return total;
-
-            const transactionDate = new Date(transaction.date);
-            if (startDate && transactionDate < new Date(startDate)) return total;
-            if (endDate && transactionDate > new Date(endDate)) return total;
-
-            return total + transaction.amount;
-        }, 0);
+        localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(newBudgets))
     }
 
     const handleSubmit = (budget: Budget) => {
-        const selectedCategory = categories.find(cat => cat.id === budget.category);
-        const categoryName = selectedCategory ? selectedCategory.name : "";
-
-        // Calculate spent amount from existing transactions
-        const spentAmount = calculateSpentAmount(
-            budget.category,
-            budget.startDate,
-            budget.endDate
-        );
-
-        const budgetWithSpent = {
-            ...budget,
-            categoryName,
-            spent: spentAmount
-        };
-
         if (editingBudget) {
-            const updatedBudgets = budgets.map((b) => (b.id === budget.id ? budgetWithSpent : b))
-            saveBudgets(updatedBudgets)
-            setSuccessMessage(`${categoryName} budget has been updated successfully.`)
+            saveBudgets(
+                budgets.map((b) => (b.id === budget.id ? budget : b))
+            )
+            setSuccessMessage(`${budget.name} has been updated successfully.`)
         } else {
-            const updatedBudgets = [...budgets, budgetWithSpent]
-            saveBudgets(updatedBudgets)
-            if (spentAmount > 0) {
-                setSuccessMessage(
-                    `${categoryName} budget has been created and updated with ${new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(spentAmount)
-                    } from existing transactions.`
-                )
-            } else {
-                setSuccessMessage(`${categoryName} budget has been created successfully.`)
-            }
+            saveBudgets([...budgets, budget])
+            setSuccessMessage(`${budget.name} has been created successfully.`)
         }
         setShowSuccess(true)
         handleClose()
 
+        // Auto-dismiss the success message after 2 seconds
         setTimeout(() => {
             setShowSuccess(false)
-        }, 2000)
-
-        // Update the budgets state
-        setBudgets(updatedBudgets)
+        }, 2000);
     }
 
     const handleEdit = (budget: Budget) => {
@@ -124,26 +68,14 @@ export default function BudgetsPage() {
     const handleDelete = (budgetId: string) => {
         const budgetToDelete = budgets.find(b => b.id === budgetId)
         if (budgetToDelete) {
-            const updatedBudgets = budgets.filter((b) => b.id !== budgetId)
-            saveBudgets(updatedBudgets)
-
-            // Update transactions to remove budget reference
-            const updatedTransactions = transactions.map(transaction => ({
-                ...transaction,
-                budgetId: transaction.budgetId === budgetId ? undefined : transaction.budgetId
-            }))
-            localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(updatedTransactions))
-            setTransactions(updatedTransactions)
-
-            setSuccessMessage(`${budgetToDelete.categoryName} budget has been deleted.`)
+            saveBudgets(budgets.filter((b) => b.id !== budgetId))
+            setSuccessMessage(`${budgetToDelete.name} has been deleted.`)
             setShowSuccess(true)
 
+            // Auto-dismiss the success message after 2 seconds
             setTimeout(() => {
                 setShowSuccess(false)
-            }, 2000)
-
-            // Update the budgets state
-            setBudgets(updatedBudgets)
+            }, 2000);
         }
     }
 
@@ -151,8 +83,6 @@ export default function BudgetsPage() {
         setIsFormOpen(false)
         setEditingBudget(undefined)
     }
-
-    console.log("Categories:", categories); // Log categories to check their structure
 
     return (
         <PageLayout
@@ -186,7 +116,6 @@ export default function BudgetsPage() {
                     <BudgetForm
                         budget={editingBudget}
                         categories={categories}
-                        existingBudgets={budgets}
                         onSubmit={handleSubmit}
                         onCancel={handleClose}
                     />
@@ -200,7 +129,6 @@ export default function BudgetsPage() {
                 budgets={budgets}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                categories={categories}
             />
         </PageLayout>
     )

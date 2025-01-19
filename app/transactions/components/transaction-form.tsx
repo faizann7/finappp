@@ -199,7 +199,7 @@ export function TransactionForm({
     }
 
     // Validate form submission
-    const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    function handleSubmit(values: z.infer<typeof formSchema>) {
         if (showBreakdown) {
             const validationMessage = getValidationMessage()
             if (validationMessage) {
@@ -232,27 +232,6 @@ export function TransactionForm({
                 ...item,
                 amount: Number(item.amount),
             })) : undefined,
-        }
-
-        // Check for matching budgets
-        const matchingBudget = budgets.find(budget => {
-            return (
-                budget.category === formattedValues.categoryId && // Match category
-                (!budget.startDate || new Date(budget.startDate) <= new Date(formattedValues.date)) && // Check start date
-                (!budget.endDate || new Date(budget.endDate) >= new Date(formattedValues.date)) // Check end date
-            );
-        });
-
-        if (matchingBudget) {
-            // Update the budget's spent amount
-            const updatedBudget = {
-                ...matchingBudget,
-                spent: matchingBudget.spent + formattedValues.amount, // Add transaction amount to spent
-            };
-
-            // Update budgets in local storage
-            const updatedBudgets = budgets.map(b => (b.id === updatedBudget.id ? updatedBudget : b));
-            localStorage.setItem('finance-tracker-budgets', JSON.stringify(updatedBudgets));
         }
 
         onSubmit(formattedValues)
