@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { SAMPLE_CATEGORIES, type Budget } from "../types"
+import { type Budget } from "../types"
 import { CalendarIcon } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -30,6 +30,9 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
+import { type Category } from "@/app/categories/types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useState } from "react"
 
 const formSchema = z.object({
     category: z.string().min(1, "Category is required"),
@@ -40,11 +43,14 @@ const formSchema = z.object({
 
 interface BudgetFormProps {
     budget?: Budget
+    categories: Category[]
+    existingBudgets: Budget[]
     onSubmit: (data: Budget) => void
     onCancel: () => void
 }
 
-export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
+export function BudgetForm({ budget, categories = [], existingBudgets = [], onSubmit, onCancel }: BudgetFormProps) {
+    const [validationError, setValidationError] = useState<string | null>(null);
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: budget ? {
@@ -58,7 +64,39 @@ export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
         },
     })
 
+    // Check for overlapping budgets
+    const checkOverlappingBudgets = (values: z.infer<typeof formSchema>) => {
+        const newStartDate = values.startDate;
+        const newEndDate = values.endDate;
+
+        const overlappingBudget = existingBudgets.find(existingBudget => {
+            if (existingBudget.id === budget?.id) return false; // Skip current budget when editing
+            if (existingBudget.category !== values.category) return false;
+
+            const existingStartDate = existingBudget.startDate ? new Date(existingBudget.startDate) : null;
+            const existingEndDate = existingBudget.endDate ? new Date(existingBudget.endDate) : null;
+
+            // If either budget doesn't have dates, they overlap
+            if (!newStartDate || !newEndDate || !existingStartDate || !existingEndDate) return true;
+
+            // Check for overlap
+            return (existingStartDate <= newEndDate && existingEndDate >= newStartDate);
+        });
+
+        return overlappingBudget;
+    }
+
     function handleSubmit(values: z.infer<typeof formSchema>) {
+        // Reset validation error
+        setValidationError(null);
+
+        // Check for overlapping budgets
+        const overlappingBudget = checkOverlappingBudgets(values);
+        if (overlappingBudget) {
+            setValidationError("A budget already exists for the selected category and time period.");
+            return;
+        }
+
         onSubmit({
             id: budget?.id || crypto.randomUUID(),
             category: values.category,
@@ -69,9 +107,26 @@ export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
         })
     }
 
+    // Check if form should be disabled
+    const isFormDisabled = categories.length === 0;
+
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                {validationError && (
+                    <Alert variant="destructive">
+                        <AlertDescription>{validationError}</AlertDescription>
+                    </Alert>
+                )}
+
+                {categories.length === 0 && (
+                    <Alert>
+                        <AlertDescription>
+                            No categories available. Please create a category first.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <FormField
                     control={form.control}
                     name="category"
@@ -85,9 +140,9 @@ export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {SAMPLE_CATEGORIES.map((category) => (
-                                        <SelectItem key={category} value={category}>
-                                            {category}
+                                    {categories.map((category) => (
+                                        <SelectItem key={category.id} value={category.id}>
+                                            {category.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -206,7 +261,7 @@ export function BudgetForm({ budget, onSubmit, onCancel }: BudgetFormProps) {
                     <Button variant="outline" type="button" onClick={onCancel}>
                         Cancel
                     </Button>
-                    <Button type="submit">
+                    <Button type="submit" disabled={isFormDisabled}>
                         {budget ? 'Update' : 'Create'} Budget
                     </Button>
                 </div>
