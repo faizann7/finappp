@@ -162,6 +162,40 @@ export default function TransactionsPage() {
         ));
     }
 
+    const handleCategoryAdd = (categoryName: string, categoryType: "Income" | "Expense") => {
+        const newCategory = {
+            id: crypto.randomUUID(),
+            name: categoryName,
+            type: categoryType,
+            color: "#000000",
+        }
+
+        const updatedCategories = [...categories, newCategory]
+        setCategories(updatedCategories)
+        localStorage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories))
+
+        toast({
+            title: "Category Created",
+            description: `${categoryName} has been created successfully.`,
+        })
+    }
+
+    const handleBudgetAdd = (budgetData: Omit<Budget, 'id'>) => {
+        const newBudget = {
+            ...budgetData,
+            id: crypto.randomUUID(),
+        }
+
+        const updatedBudgets = [...budgets, newBudget]
+        setBudgets(updatedBudgets)
+        localStorage.setItem(BUDGETS_KEY, JSON.stringify(updatedBudgets))
+
+        toast({
+            title: "Budget Created",
+            description: `${budgetData.name} has been created successfully.`,
+        })
+    }
+
     return (
         <PageLayout
             title="Transactions"
@@ -193,6 +227,8 @@ export default function TransactionsPage() {
                         onSubmit={handleSubmit}
                         onCancel={handleClose}
                         updateBudget={updateBudget}
+                        onCategoryAdd={handleCategoryAdd}
+                        onBudgetAdd={handleBudgetAdd}
                     />
                 )
             }}

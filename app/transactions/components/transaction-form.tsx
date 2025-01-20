@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { CalendarIcon, Plus, Minus, Trash2 } from "lucide-react"
-import { format } from "date-fns"
+import { format, startOfMonth, endOfMonth } from "date-fns"
 import { cn } from "@/lib/utils"
 import { type Transaction, type TransactionFormData } from "../types"
 import { type Account } from "../../accounts/types"
@@ -41,6 +41,7 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Checkbox } from "@/components/ui/checkbox"
+import { DropdownWithAddItem } from "@/components/ui/dropdown-with-add-item"
 
 const formSchema = z.object({
     date: z.date(),
@@ -69,6 +70,8 @@ interface TransactionFormProps {
     onSubmit: (data: TransactionFormData) => void
     onCancel: () => void
     updateBudget: (updatedBudget: Budget) => void
+    onCategoryAdd: (categoryName: string, categoryType: "Income" | "Expense") => void
+    onBudgetAdd: (budget: Omit<Budget, 'id'>) => void
 }
 
 const getAvailableBudgets = (
@@ -113,6 +116,8 @@ export function TransactionForm({
     onSubmit,
     onCancel,
     updateBudget,
+    onCategoryAdd,
+    onBudgetAdd,
 }: TransactionFormProps) {
     const [showBreakdown, setShowBreakdown] = useState(false)
     const [subItemsTotal, setSubItemsTotal] = useState(0)
@@ -129,18 +134,20 @@ export function TransactionForm({
             categoryId: transaction.categoryId,
             description: transaction.description,
             amount: transaction.amount,
-            budgetId: transaction.budgetId || "",
+            budgetId: transaction.budgetId || "no_budget",
             isRecurring: transaction.isRecurring,
             recurrenceFrequency: transaction.recurrenceFrequency,
             recurrenceEndDate: transaction.recurrenceEndDate ? new Date(transaction.recurrenceEndDate) : undefined,
             subItems: transaction.subItems || [],
         } : {
             date: new Date(),
-            type: "Expense",
+            accountId: "",
+            type: "Expense" as const,
+            categoryId: "",
             amount: 0,
+            budgetId: "no_budget",
             isRecurring: false,
             subItems: [],
-            budgetId: "",
         },
     })
 
@@ -238,36 +245,72 @@ export function TransactionForm({
 
     // Validate form submission
     function handleSubmit(values: z.infer<typeof formSchema>) {
-        if (values.type === "Expense" && values.budgetId && values.budgetId !== "no_budget") {
-            const budgetToUpdate = budgets.find(b => b.id === values.budgetId);
-            if (budgetToUpdate) {
-                const newSpentAmount = budgetToUpdate.spent + values.amount;
+        // Only handle budget creation and updates for Expense transactions
+        if (values.type === "Expense") {
+            const categoryName = categories.find(c => c.id === values.categoryId)?.name
 
-                // Don't allow overspending
-                if (newSpentAmount > budgetToUpdate.amount) {
-                    form.setError("budgetId", {
-                        type: "manual",
-                        message: `This would exceed the budget limit of ${formatCurrency(budgetToUpdate.amount)}`,
-                    });
-                    return;
+            // If no budget is selected but category exists, create a new budget
+            if (values.budgetId === "no_budget" && categoryName) {
+                const newBudget = {
+                    name: `${categoryName} Budget`,
+                    category: categoryName,
+                    amount: values.amount * 2,
+                    spent: values.amount,
+                    timeframe: "monthly" as const,
+                    startDate: startOfMonth(new Date()).toISOString(),
+                    endDate: endOfMonth(new Date()).toISOString(),
                 }
 
-                const updatedBudget = {
-                    ...budgetToUpdate,
-                    spent: newSpentAmount,
-                };
+                onBudgetAdd(newBudget)
+            }
 
-                updateBudget(updatedBudget);
+            // Update existing budget if selected
+            if (values.budgetId && values.budgetId !== "no_budget") {
+                const budgetToUpdate = budgets.find(b => b.id === values.budgetId);
+                if (budgetToUpdate) {
+                    const newSpentAmount = budgetToUpdate.spent + values.amount;
+
+                    if (newSpentAmount > budgetToUpdate.amount) {
+                        form.setError("budgetId", {
+                            type: "manual",
+                            message: `This would exceed the budget limit of ${formatCurrency(budgetToUpdate.amount)}`,
+                        });
+                        return;
+                    }
+
+                    updateBudget({
+                        ...budgetToUpdate,
+                        spent: newSpentAmount,
+                    });
+                }
             }
         }
 
-        // Continue with transaction submission
+        // Submit the transaction with the correct type
         onSubmit({
             ...values,
             id: transaction?.id,
+            type: values.type, // Ensure we're using the selected type
             budgetId: values.type === "Expense" ? values.budgetId : undefined,
         });
     }
+
+    // Watch the transaction type to filter categories
+    const transactionType = form.watch("type")
+
+    // Filter categories based on the selected transaction type
+    const filteredCategories = categories.filter(category => {
+        return (transactionType === "Income" && category.type === "Income") ||
+            (transactionType === "Expense" && category.type === "Expense");
+    });
+
+    // Update form fields when transaction type changes
+    useEffect(() => {
+        // Clear budget selection when transaction type is not Expense
+        if (transactionType !== "Expense") {
+            form.setValue("budgetId", "no_budget")
+        }
+    }, [transactionType, form])
 
     if (isInitializing) {
         return <div className="p-8 text-center">Loading transaction details...</div>
@@ -283,10 +326,19 @@ export function TransactionForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Transaction Type</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select
+                                    onValueChange={(value) => {
+                                        field.onChange(value)
+                                        // Clear budget when switching to non-expense type
+                                        if (value !== "Expense") {
+                                            form.setValue("budgetId", "no_budget")
+                                        }
+                                    }}
+                                    value={field.value}
+                                >
                                     <FormControl>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select transaction type" />
+                                            <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
@@ -401,20 +453,21 @@ export function TransactionForm({
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Category</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a category" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {categories.map((category) => (
-                                            <SelectItem key={category.id} value={category.id}>
-                                                {category.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <FormControl>
+                                    <DropdownWithAddItem
+                                        items={filteredCategories.map(c => c.name)}
+                                        value={filteredCategories.find(c => c.id === field.value)?.name || ""}
+                                        onItemSelect={(categoryName) => {
+                                            const category = filteredCategories.find(c => c.name === categoryName)
+                                            if (category) {
+                                                field.onChange(category.id)
+                                            }
+                                        }}
+                                        onItemAdd={(categoryName) => {
+                                            onCategoryAdd(categoryName, transactionType)
+                                        }}
+                                    />
+                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -434,75 +487,77 @@ export function TransactionForm({
                         )}
                     />
 
-                    <FormField
-                        control={form.control}
-                        name="budgetId"
-                        render={({ field }) => {
-                            const type = form.watch("type");
-                            const date = form.watch("date");
-                            const categoryId = form.watch("categoryId");
-                            const availableBudgets = type === "Expense"
-                                ? getAvailableBudgets(budgets, date, categoryId, categories)
-                                : [];
+                    {/* Only show budget field for Expense transactions */}
+                    {transactionType === "Expense" && (
+                        <FormField
+                            control={form.control}
+                            name="budgetId"
+                            render={({ field }) => {
+                                const date = form.watch("date");
+                                const categoryId = form.watch("categoryId");
+                                const availableBudgets = transactionType === "Expense"
+                                    ? getAvailableBudgets(budgets, date, categoryId, categories)
+                                    : [];
 
-                            const categoryName = categories.find(c => c.id === categoryId)?.name;
+                                const categoryName = categories.find(c => c.id === categoryId)?.name;
 
-                            return (
-                                <FormItem>
-                                    <FormLabel>Budget</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                        disabled={type !== "Expense"}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder={
-                                                    type !== "Expense"
-                                                        ? "Only available for expenses"
-                                                        : "Select a budget"
-                                                } />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="no_budget">No Budget</SelectItem>
-                                            {availableBudgets.length > 0 ? (
-                                                availableBudgets.map((budget) => (
-                                                    <SelectItem key={budget.id} value={budget.id}>
-                                                        {`${budget.name} - ${formatCurrency(budget.amount - budget.spent)} remaining`}
-                                                    </SelectItem>
-                                                ))
-                                            ) : (
-                                                <div className="p-2 text-sm text-muted-foreground">
-                                                    {!categoryId ? (
-                                                        "Select a category to see available budgets"
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            <p>No budgets available for {categoryName}</p>
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="w-full"
-                                                                onClick={() => {
-                                                                    // TODO: Implement quick budget creation
-                                                                    // This could open a modal or redirect to budget creation
-                                                                    console.log("Create budget for", categoryName);
-                                                                }}
-                                                            >
-                                                                Create Budget for {categoryName}
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            );
-                        }}
-                    />
+                                return (
+                                    <FormItem>
+                                        <FormLabel>Budget</FormLabel>
+                                        <Select
+                                            onValueChange={field.onChange}
+                                            defaultValue={field.value}
+                                            disabled={transactionType !== "Expense"}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder={
+                                                        transactionType !== "Expense"
+                                                            ? "Only available for expenses"
+                                                            : "Select a budget"
+                                                    } />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="no_budget">No Budget</SelectItem>
+                                                {availableBudgets.length > 0 ? (
+                                                    availableBudgets.map((budget) => (
+                                                        <SelectItem key={budget.id} value={budget.id}>
+                                                            {`${budget.name} - ${formatCurrency(budget.amount - budget.spent)} remaining`}
+                                                        </SelectItem>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-2 text-sm text-muted-foreground">
+                                                        {!categoryId ? (
+                                                            "Select a category to see available budgets"
+                                                        ) : (
+                                                            <div className="space-y-2">
+                                                                <p>No budgets available for {categoryName}</p>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="w-full"
+                                                                    onClick={() => {
+                                                                        // TODO: Implement quick budget creation
+                                                                        // This could open a modal or redirect to budget creation
+                                                                        console.log("Create budget for", categoryName);
+                                                                    }}
+                                                                >
+                                                                    Create Budget for {categoryName}
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                );
+                            }}
+                        />
+                    )}
                 </div>
 
                 {/* Recurring Transaction Section */}

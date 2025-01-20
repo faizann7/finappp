@@ -71,6 +71,17 @@ export default function AccountsPage() {
         setEditingAccount(undefined)
     }
 
+    const accountStats = {
+        totalAssets: accounts
+            .filter(a => a.type !== 'Credit Card')
+            .reduce((sum, a) => sum + a.balance, 0),
+        totalLiabilities: accounts
+            .filter(a => a.type === 'Credit Card')
+            .reduce((sum, a) => sum + a.balance, 0),
+        netWorth: accounts.reduce((sum, a) =>
+            sum + (a.type === 'Credit Card' ? -a.balance : a.balance), 0)
+    }
+
     return (
         <PageLayout
             title="Accounts"

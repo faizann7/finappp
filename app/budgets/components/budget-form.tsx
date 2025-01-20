@@ -43,7 +43,6 @@ const formSchema = z.object({
     category: z.string().min(1, "Category is required"),
     amount: z.string().transform((val) => parseFloat(val)),
     timeframe: z.enum(["weekly", "monthly", "yearly", "custom"]),
-    budgetType: z.enum(["added_only", "all_transactions"]),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
 }).refine((data) => {
@@ -63,6 +62,26 @@ const TIMEFRAME_OPTIONS = [
     { label: "Custom", value: "custom" },
 ] as const
 
+const BUDGET_TEMPLATES = [
+    {
+        name: "50/30/20 Budget",
+        categories: [
+            { name: "Needs (50%)", percentage: 50 },
+            { name: "Wants (30%)", percentage: 30 },
+            { name: "Savings (20%)", percentage: 20 }
+        ]
+    },
+    {
+        name: "Zero-Based Budget",
+        categories: [
+            { name: "Housing", percentage: 25 },
+            { name: "Transportation", percentage: 15 },
+            { name: "Food", percentage: 15 },
+            // ... other categories
+        ]
+    }
+]
+
 interface BudgetFormProps {
     budget?: Budget
     categories: Category[]
@@ -78,7 +97,6 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             category: budget.category,
             amount: budget.amount.toString(),
             timeframe: "custom",
-            budgetType: budget.budgetType || "added_only",
             startDate: budget.startDate ? new Date(budget.startDate) : undefined,
             endDate: budget.endDate ? new Date(budget.endDate) : undefined,
         } : {
@@ -86,7 +104,6 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             category: "",
             amount: "0",
             timeframe: "monthly",
-            budgetType: "added_only",
             startDate: startOfMonth(new Date()),
             endDate: endOfMonth(new Date()),
         },
@@ -122,7 +139,6 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             spent: budget?.spent || 0,
             startDate: values.startDate?.toISOString(),
             endDate: values.endDate?.toISOString(),
-            budgetType: values.budgetType,
         })
     }
 
@@ -213,32 +229,6 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                                             {option.label}
                                         </SelectItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="budgetType"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Budget Type</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select budget type" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    <SelectItem value="added_only">
-                                        Added Only (Manual)
-                                    </SelectItem>
-                                    <SelectItem value="all_transactions">
-                                        All Transactions (Automatic)
-                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
