@@ -160,6 +160,10 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
+                                    <SelectItem value="all">All Categories</SelectItem>
+                                    <SelectItem value="divider" disabled>
+                                        ─────────────
+                                    </SelectItem>
                                     {categories.map((category) => (
                                         <SelectItem key={category.id} value={category.name}>
                                             {category.name}
@@ -229,11 +233,12 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {BUDGET_TYPE_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="added_only">
+                                        Added Only (Manual)
+                                    </SelectItem>
+                                    <SelectItem value="all_transactions">
+                                        All Transactions (Automatic)
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />

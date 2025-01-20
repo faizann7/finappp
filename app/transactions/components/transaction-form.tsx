@@ -71,6 +71,40 @@ interface TransactionFormProps {
     updateBudget: (updatedBudget: Budget) => void
 }
 
+const getAvailableBudgets = (
+    budgets: Budget[],
+    transactionDate: Date,
+    categoryId: string,
+    categories: Category[]
+) => {
+    return budgets.filter(budget => {
+        // Check if transaction date falls within budget period
+        const budgetStart = budget.startDate ? new Date(budget.startDate) : null;
+        const budgetEnd = budget.endDate ? new Date(budget.endDate) : null;
+
+        const isWithinDateRange = (!budgetStart || transactionDate >= budgetStart) &&
+            (!budgetEnd || transactionDate <= budgetEnd);
+
+        // Get category name from categoryId
+        const categoryName = categories.find(c => c.id === categoryId)?.name;
+
+        // Check if categories match (including "all" category budgets)
+        const isMatchingCategory = budget.category === "all" || budget.category === categoryName;
+
+        // Check if budget has available funds
+        const hasAvailableFunds = budget.amount > budget.spent;
+
+        return isWithinDateRange && isMatchingCategory && hasAvailableFunds;
+    });
+};
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+    }).format(amount);
+};
+
 export function TransactionForm({
     transaction,
     accounts,
@@ -204,57 +238,35 @@ export function TransactionForm({
 
     // Validate form submission
     function handleSubmit(values: z.infer<typeof formSchema>) {
-        // Check if the transaction is associated with a budget
-        if (values.budgetId && values.budgetId !== "no_budget") {
-            // Find the budget that is being updated
+        if (values.type === "Expense" && values.budgetId && values.budgetId !== "no_budget") {
             const budgetToUpdate = budgets.find(b => b.id === values.budgetId);
             if (budgetToUpdate) {
-                // Update the spent amount of the budget
+                const newSpentAmount = budgetToUpdate.spent + values.amount;
+
+                // Don't allow overspending
+                if (newSpentAmount > budgetToUpdate.amount) {
+                    form.setError("budgetId", {
+                        type: "manual",
+                        message: `This would exceed the budget limit of ${formatCurrency(budgetToUpdate.amount)}`,
+                    });
+                    return;
+                }
+
                 const updatedBudget = {
                     ...budgetToUpdate,
-                    spent: budgetToUpdate.spent + values.amount, // Add the transaction amount to the spent amount
+                    spent: newSpentAmount,
                 };
 
-                // Call the updateBudget function to update the budget in state
                 updateBudget(updatedBudget);
             }
         }
 
-        if (showBreakdown) {
-            const validationMessage = getValidationMessage()
-            if (validationMessage) {
-                form.setError("amount", {
-                    type: "manual",
-                    message: validationMessage,
-                })
-                return
-            }
-
-            if (values.subItems?.length === 0) {
-                const confirmed = window.confirm(
-                    `No breakdown items added. The transaction will have a total of $${values.amount.toFixed(2)}. Do you want to continue?`
-                )
-                if (!confirmed) return
-            }
-        } else if (values.amount <= 0) {
-            form.setError("amount", {
-                type: "manual",
-                message: "Amount must be greater than 0",
-            })
-            return
-        }
-
-        // Ensure subItems are properly formatted before submission
-        const formattedValues = {
+        // Continue with transaction submission
+        onSubmit({
             ...values,
             id: transaction?.id,
-            subItems: showBreakdown ? values.subItems?.map(item => ({
-                ...item,
-                amount: Number(item.amount),
-            })) : undefined,
-        }
-
-        onSubmit(formattedValues)
+            budgetId: values.type === "Expense" ? values.budgetId : undefined,
+        });
     }
 
     if (isInitializing) {
@@ -425,27 +437,71 @@ export function TransactionForm({
                     <FormField
                         control={form.control}
                         name="budgetId"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Budget</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a budget" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="no_budget">No Budget</SelectItem>
-                                        {budgets.map((budget) => (
-                                            <SelectItem key={budget.id} value={budget.id}>
-                                                {budget.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                        render={({ field }) => {
+                            const type = form.watch("type");
+                            const date = form.watch("date");
+                            const categoryId = form.watch("categoryId");
+                            const availableBudgets = type === "Expense"
+                                ? getAvailableBudgets(budgets, date, categoryId, categories)
+                                : [];
+
+                            const categoryName = categories.find(c => c.id === categoryId)?.name;
+
+                            return (
+                                <FormItem>
+                                    <FormLabel>Budget</FormLabel>
+                                    <Select
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        disabled={type !== "Expense"}
+                                    >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={
+                                                    type !== "Expense"
+                                                        ? "Only available for expenses"
+                                                        : "Select a budget"
+                                                } />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="no_budget">No Budget</SelectItem>
+                                            {availableBudgets.length > 0 ? (
+                                                availableBudgets.map((budget) => (
+                                                    <SelectItem key={budget.id} value={budget.id}>
+                                                        {`${budget.name} - ${formatCurrency(budget.amount - budget.spent)} remaining`}
+                                                    </SelectItem>
+                                                ))
+                                            ) : (
+                                                <div className="p-2 text-sm text-muted-foreground">
+                                                    {!categoryId ? (
+                                                        "Select a category to see available budgets"
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            <p>No budgets available for {categoryName}</p>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="w-full"
+                                                                onClick={() => {
+                                                                    // TODO: Implement quick budget creation
+                                                                    // This could open a modal or redirect to budget creation
+                                                                    console.log("Create budget for", categoryName);
+                                                                }}
+                                                            >
+                                                                Create Budget for {categoryName}
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            );
+                        }}
                     />
                 </div>
 
