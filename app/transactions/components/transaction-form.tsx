@@ -329,7 +329,6 @@ export function TransactionForm({
                                 <Select
                                     onValueChange={(value) => {
                                         field.onChange(value)
-                                        // Clear budget when switching to non-expense type
                                         if (value !== "Expense") {
                                             form.setValue("budgetId", "no_budget")
                                         }
@@ -390,31 +389,18 @@ export function TransactionForm({
                         )}
                     />
 
-
                     <FormField
                         control={form.control}
                         name="amount"
                         render={({ field }) => (
                             <FormItem>
-                                <div className="flex justify-between items-center">
-                                    <FormLabel>Amount</FormLabel>
-                                    {showBreakdown && (
-                                        <span className="text-xs text-muted-foreground">
-                                            Automatically calculated from breakdown
-                                        </span>
-                                    )}
-                                </div>
+                                <FormLabel>Amount</FormLabel>
                                 <FormControl>
                                     <Input
                                         type="number"
-                                        step="1"
+                                        step="0.01"
                                         {...field}
-                                        onChange={(e) => handleAmountChange(parseFloat(e.target.value))}
-                                        disabled={showBreakdown}
-                                        className={cn(
-                                            showBreakdown && "bg-muted cursor-not-allowed",
-                                            exceedsTotal && "border-destructive"
-                                        )}
+                                        placeholder="0.00"
                                     />
                                 </FormControl>
                                 <FormMessage />
