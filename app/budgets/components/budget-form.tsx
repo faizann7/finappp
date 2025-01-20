@@ -33,11 +33,17 @@ import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, isBe
 import { type Category } from "../categories/types"
 import { useEffect } from "react"
 
+const BUDGET_TYPE_OPTIONS = [
+    { label: "Added Only", value: "added_only" },
+    { label: "All Transactions", value: "all_transactions" },
+] as const
+
 const formSchema = z.object({
     name: z.string().min(1, "Budget name is required"),
     category: z.string().min(1, "Category is required"),
     amount: z.string().transform((val) => parseFloat(val)),
     timeframe: z.enum(["weekly", "monthly", "yearly", "custom"]),
+    budgetType: z.enum(["added_only", "all_transactions"]),
     startDate: z.date().optional(),
     endDate: z.date().optional(),
 }).refine((data) => {
@@ -72,6 +78,7 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             category: budget.category,
             amount: budget.amount.toString(),
             timeframe: "custom",
+            budgetType: budget.budgetType || "added_only",
             startDate: budget.startDate ? new Date(budget.startDate) : undefined,
             endDate: budget.endDate ? new Date(budget.endDate) : undefined,
         } : {
@@ -79,6 +86,7 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             category: "",
             amount: "0",
             timeframe: "monthly",
+            budgetType: "added_only",
             startDate: startOfMonth(new Date()),
             endDate: endOfMonth(new Date()),
         },
@@ -114,6 +122,7 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             spent: budget?.spent || 0,
             startDate: values.startDate?.toISOString(),
             endDate: values.endDate?.toISOString(),
+            budgetType: values.budgetType,
         })
     }
 
@@ -196,6 +205,31 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                                 </FormControl>
                                 <SelectContent>
                                     {TIMEFRAME_OPTIONS.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                            {option.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="budgetType"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Budget Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select budget type" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {BUDGET_TYPE_OPTIONS.map((option) => (
                                         <SelectItem key={option.value} value={option.value}>
                                             {option.label}
                                         </SelectItem>

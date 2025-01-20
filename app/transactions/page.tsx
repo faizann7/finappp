@@ -151,6 +151,17 @@ export default function TransactionsPage() {
         return budgets.find(b => b.id === budgetId)?.category
     }
 
+    const updateBudget = (updatedBudget: Budget) => {
+        setBudgets((prevBudgets) =>
+            prevBudgets.map((budget) =>
+                budget.id === updatedBudget.id ? updatedBudget : budget
+            )
+        );
+        localStorage.setItem(BUDGETS_KEY, JSON.stringify(
+            budgets.map(b => b.id === updatedBudget.id ? updatedBudget : b)
+        ));
+    }
+
     return (
         <PageLayout
             title="Transactions"
@@ -181,6 +192,7 @@ export default function TransactionsPage() {
                         budgets={budgets}
                         onSubmit={handleSubmit}
                         onCancel={handleClose}
+                        updateBudget={updateBudget}
                     />
                 )
             }}

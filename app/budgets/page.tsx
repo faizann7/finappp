@@ -84,6 +84,15 @@ export default function BudgetsPage() {
         setEditingBudget(undefined)
     }
 
+    const updateBudget = (updatedBudget: Budget) => {
+        setBudgets((prevBudgets) =>
+            prevBudgets.map((budget) =>
+                budget.id === updatedBudget.id ? updatedBudget : budget
+            )
+        );
+        localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(updatedBudgets));
+    };
+
     return (
         <PageLayout
             title="Budgets"

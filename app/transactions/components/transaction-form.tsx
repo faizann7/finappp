@@ -40,6 +40,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
     date: z.date(),
@@ -48,7 +49,7 @@ const formSchema = z.object({
     categoryId: z.string().min(1, "Category is required"),
     description: z.string().optional(),
     amount: z.number().min(0.01, "Amount must be greater than 0"),
-    budgetId: z.string().optional(),
+    budgetId: z.string(),
     isRecurring: z.boolean().default(false),
     recurrenceFrequency: z.enum(["Daily", "Weekly", "Monthly", "Yearly"]).optional(),
     recurrenceEndDate: z.date().optional(),
@@ -67,6 +68,7 @@ interface TransactionFormProps {
     budgets: Budget[]
     onSubmit: (data: TransactionFormData) => void
     onCancel: () => void
+    updateBudget: (updatedBudget: Budget) => void
 }
 
 export function TransactionForm({
@@ -76,6 +78,7 @@ export function TransactionForm({
     budgets,
     onSubmit,
     onCancel,
+    updateBudget,
 }: TransactionFormProps) {
     const [showBreakdown, setShowBreakdown] = useState(false)
     const [subItemsTotal, setSubItemsTotal] = useState(0)
@@ -92,7 +95,7 @@ export function TransactionForm({
             categoryId: transaction.categoryId,
             description: transaction.description,
             amount: transaction.amount,
-            budgetId: transaction.budgetId,
+            budgetId: transaction.budgetId || "",
             isRecurring: transaction.isRecurring,
             recurrenceFrequency: transaction.recurrenceFrequency,
             recurrenceEndDate: transaction.recurrenceEndDate ? new Date(transaction.recurrenceEndDate) : undefined,
@@ -103,6 +106,7 @@ export function TransactionForm({
             amount: 0,
             isRecurring: false,
             subItems: [],
+            budgetId: "",
         },
     })
 
@@ -200,6 +204,22 @@ export function TransactionForm({
 
     // Validate form submission
     function handleSubmit(values: z.infer<typeof formSchema>) {
+        // Check if the transaction is associated with a budget
+        if (values.budgetId && values.budgetId !== "no_budget") {
+            // Find the budget that is being updated
+            const budgetToUpdate = budgets.find(b => b.id === values.budgetId);
+            if (budgetToUpdate) {
+                // Update the spent amount of the budget
+                const updatedBudget = {
+                    ...budgetToUpdate,
+                    spent: budgetToUpdate.spent + values.amount, // Add the transaction amount to the spent amount
+                };
+
+                // Call the updateBudget function to update the budget in state
+                updateBudget(updatedBudget);
+            }
+        }
+
         if (showBreakdown) {
             const validationMessage = getValidationMessage()
             if (validationMessage) {
@@ -397,6 +417,32 @@ export function TransactionForm({
                                 <FormControl>
                                     <Input {...field} placeholder="Enter description" />
                                 </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="budgetId"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Budget</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a budget" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="no_budget">No Budget</SelectItem>
+                                        {budgets.map((budget) => (
+                                            <SelectItem key={budget.id} value={budget.id}>
+                                                {budget.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
