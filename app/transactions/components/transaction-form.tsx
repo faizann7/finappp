@@ -292,6 +292,7 @@ export function TransactionForm({
             id: transaction?.id,
             type: values.type, // Ensure we're using the selected type
             budgetId: values.type === "Expense" ? values.budgetId : undefined,
+            amount: parseFloat(values.amount.toString()), // Ensure amount is a number
         });
     }
 
@@ -400,7 +401,11 @@ export function TransactionForm({
                                         type="number"
                                         step="0.01"
                                         {...field}
-                                        placeholder="0.00"
+                                        placeholder="Enter amount"
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            field.onChange(value ? parseFloat(value) : 0);
+                                        }}
                                     />
                                 </FormControl>
                                 <FormMessage />
@@ -711,4 +716,14 @@ export function TransactionForm({
             </form>
         </Form>
     )
-} 
+}
+
+// Example of a category list
+export const categories = [
+    { id: "4941e344-66c2-4ba2-a556-d109e0585c12", name: "Food" },
+    { id: "b8a2d4ba-f2f2-463a-b9a0-7d7f76df640e", name: "Transport" },
+    { id: "b0ed98a2-d8b8-44bc-ac70-c1f3529d0e98", name: "Utilities" },
+    { id: "8a6a1d23-14e9-400d-9682-74b0c544543c", name: "Entertainment" },
+    { id: "b52f9ac3-c246-46b1-a220-a4e20b44cd52", name: "Healthcare" },
+    { id: "8c2575a7-2ab3-4e0d-a97b-e5e70f3ddd47", name: "Other" }
+]; 
