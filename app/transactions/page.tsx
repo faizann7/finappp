@@ -40,6 +40,8 @@ export default function TransactionsPage() {
     const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>()
     const [deletingTransaction, setDeletingTransaction] = useState<Transaction | undefined>()
     const [loading, setLoading] = useState(true)
+    const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
+    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false)
 
     useEffect(() => {
         const loadData = () => {
@@ -196,6 +198,26 @@ export default function TransactionsPage() {
         })
     }
 
+    const handleBulkDelete = (transactionIds: string[]) => {
+        setSelectedTransactions(transactionIds)
+        setIsBulkDeleteDialogOpen(true)
+    }
+
+    const handleBulkDeleteConfirm = () => {
+        if (selectedTransactions.length > 0) {
+            const updatedTransactions = transactions.filter(
+                (t) => !selectedTransactions.includes(t.id)
+            )
+            saveTransactions(updatedTransactions)
+            toast({
+                title: "Success",
+                description: `${selectedTransactions.length} transaction(s) have been deleted.`,
+            })
+            setSelectedTransactions([])
+            setIsBulkDeleteDialogOpen(false)
+        }
+    }
+
     return (
         <PageLayout
             title="Transactions"
@@ -239,6 +261,7 @@ export default function TransactionsPage() {
                 categories={categories}
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
+                onBulkDelete={handleBulkDelete}
             />
 
             <AlertDialog
@@ -258,6 +281,32 @@ export default function TransactionsPage() {
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={isBulkDeleteDialogOpen}
+                onOpenChange={setIsBulkDeleteDialogOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Transactions</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete {selectedTransactions.length} transaction(s)?
+                            This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setIsBulkDeleteDialogOpen(false)}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleBulkDeleteConfirm}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Delete

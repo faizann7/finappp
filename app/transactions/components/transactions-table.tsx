@@ -51,6 +51,7 @@ import {
     X,
     CalendarIcon,
     MoreHorizontal,
+    Edit2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { type Transaction } from "../types"
@@ -58,6 +59,7 @@ import { type Account } from "../../accounts/types"
 import { type Category } from "../../categories/types"
 import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Add category colors mapping
 const categoryColors: Record<string, { bg: string; text: string }> = {
@@ -73,6 +75,7 @@ interface TransactionsTableProps {
     categories: Category[]
     onEdit: (transaction: Transaction) => void
     onDelete: (transaction: Transaction) => void
+    onBulkDelete?: (transactionIds: string[]) => void
 }
 
 export function TransactionsTable({
@@ -81,6 +84,7 @@ export function TransactionsTable({
     categories,
     onEdit,
     onDelete,
+    onBulkDelete,
 }: TransactionsTableProps) {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [page, setPage] = useState(1)
@@ -96,6 +100,7 @@ export function TransactionsTable({
         key: "date",
         direction: "desc",
     })
+    const [selectedRows, setSelectedRows] = useState<string[]>([])
 
     const [dateRange, setDateRange] = useState<{
         from: Date | null
@@ -183,6 +188,16 @@ export function TransactionsTable({
         );
     };
 
+    const handleRowSelect = (transactionId: string) => {
+        setSelectedRows((prev) => {
+            if (prev.includes(transactionId)) {
+                return prev.filter(id => id !== transactionId)
+            } else {
+                return [...prev, transactionId]
+            }
+        })
+    }
+
     return (
         <div className="space-y-4">
             {/* Filters Row */}
@@ -217,18 +232,13 @@ export function TransactionsTable({
                             <Calendar
                                 initialFocus
                                 mode="range"
-                                defaultMonth={dateRange.from}
                                 selected={{
                                     from: dateRange.from,
                                     to: dateRange.to,
                                 }}
                                 onSelect={(range) => {
-                                    setDateRange({
-                                        from: range?.from || null,
-                                        to: range?.to || null,
-                                    })
+                                    setDateRange(range)
                                 }}
-                                numberOfMonths={2}
                             />
                         </PopoverContent>
                     </Popover>
@@ -376,6 +386,17 @@ export function TransactionsTable({
                         </Button>
                     )}
                 </div>
+                {/* Bulk Delete Button */}
+                {selectedRows.length > 0 && (
+                    <Button
+                        variant="outline"
+                        onClick={() => onBulkDelete?.(selectedRows)}
+                        className="gap-2 h-8"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Selected ({selectedRows.length})
+                    </Button>
+                )}
             </div>
 
             {/* Enhanced Table */}
@@ -383,7 +404,18 @@ export function TransactionsTable({
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[30px]"></TableHead>
+                            <TableHead>
+                                <Checkbox
+                                    checked={selectedRows.length === data.length}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) {
+                                            setSelectedRows(data.map(transaction => transaction.id))
+                                        } else {
+                                            setSelectedRows([])
+                                        }
+                                    }}
+                                />
+                            </TableHead>
                             <TableHead>
                                 <Button
                                     variant="ghost"
@@ -432,19 +464,10 @@ export function TransactionsTable({
                             <>
                                 <TableRow key={transaction.id}>
                                     <TableCell>
-                                        {transaction.subItems?.length ? (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => toggleRowExpansion(transaction.id)}
-                                            >
-                                                {expandedRows.has(transaction.id) ? (
-                                                    <ChevronUp className="h-4 w-4" />
-                                                ) : (
-                                                    <ChevronDown className="h-4 w-4" />
-                                                )}
-                                            </Button>
-                                        ) : null}
+                                        <Checkbox
+                                            checked={selectedRows.includes(transaction.id)}
+                                            onCheckedChange={() => handleRowSelect(transaction.id)}
+                                        />
                                     </TableCell>
                                     <TableCell>{format(new Date(transaction.date), "PP")}</TableCell>
                                     <TableCell>
