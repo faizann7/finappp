@@ -4,11 +4,17 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { PageLayout } from "@/components/page-layout"
 import { CategoryForm } from "./components/category-form"
-import { DataTable } from "@/components/ui/data-table"
 import { useToast } from "@/hooks/use-toast"
 import { type Category } from "./types"
-import { Plus, Tag, Folder, Tags } from "lucide-react"
+import { Plus, Tag, Folder, Tags, MoreHorizontal, Trash2, Edit, X, ChevronDown } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,6 +25,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Separator } from "@/components/ui/separator"
+import { CategoriesTable } from "./components/categories-table"
 
 const STORAGE_KEY = 'finance-tracker-categories'
 
@@ -43,17 +51,17 @@ export default function CategoriesPage() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newCategories))
     }
 
+    // Handle form submission for adding/updating categories
     const handleSubmit = (category: Category) => {
-        const existingCategory = categories.find(c => c.name === category.name && c.type === category.type);
+        const existingCategory = categories.find(c => c.name.toLowerCase() === category.name.toLowerCase() && c.type === category.type)
         if (existingCategory && existingCategory.id !== category.id) {
             toast({ title: "Error", description: "Category name must be unique within the same type." })
-            return;
+            return
         }
 
         if (editingCategory) {
-            saveCategories(
-                categories.map(c => (c.id === category.id ? category : c))
-            )
+            const updatedCategories = categories.map(c => (c.id === category.id ? category : c))
+            saveCategories(updatedCategories)
             toast({ title: "Success", description: `${category.name} has been updated successfully.` })
         } else {
             saveCategories([...categories, { ...category, id: crypto.randomUUID() }])
@@ -62,21 +70,24 @@ export default function CategoriesPage() {
         handleClose()
     }
 
+    // Handle editing a category
     const handleEdit = (category: Category) => {
         setEditingCategory(category)
         setIsFormOpen(true)
     }
 
+    // Handle deleting a category
     const handleDeleteClick = (category: Category) => {
         setDeletingCategory(category)
     }
 
     const handleDeleteConfirm = () => {
         if (deletingCategory) {
-            saveCategories(categories.filter((c) => c.id !== deletingCategory.id))
+            const updatedCategories = categories.filter(c => c.id !== deletingCategory.id)
+            saveCategories(updatedCategories)
             toast({
                 title: "Success",
-                description: `${deletingCategory.name} has been deleted.`
+                description: `${deletingCategory.name} has been deleted.`,
             })
             setDeletingCategory(undefined)
         }
@@ -89,6 +100,16 @@ export default function CategoriesPage() {
     const handleClose = () => {
         setIsFormOpen(false)
         setEditingCategory(undefined)
+    }
+
+    // Handle bulk deletion
+    const handleBulkDelete = (categoryIds: string[]) => {
+        const updatedCategories = categories.filter(c => !categoryIds.includes(c.id))
+        saveCategories(updatedCategories)
+        toast({
+            title: "Success",
+            description: `${categoryIds.length} category(ies) have been deleted.`,
+        })
     }
 
     return (
@@ -122,45 +143,14 @@ export default function CategoriesPage() {
                 )
             }}
         >
-            <DataTable
+            <CategoriesTable
                 data={categories}
-                columns={[
-                    { accessor: 'name', header: 'Category Name' },
-                    {
-                        accessor: 'type',
-                        header: 'Type',
-                        Cell: ({ row }: { row: { original: Category } }) => (
-                            <Badge variant="outline">
-                                {row.original.type}
-                            </Badge>
-                        )
-                    },
-                    {
-                        accessor: 'actions',
-                        header: 'Actions',
-                        Cell: ({ row }: { row: { original: Category } }) => (
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEdit(row.original)}
-                                >
-                                    Edit
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteClick(row.original)}
-                                >
-                                    Delete
-                                </Button>
-                            </div>
-                        )
-                    }
-                ]}
+                onEdit={handleEdit}
+                onDelete={handleDeleteClick}
+                onBulkDelete={handleBulkDelete}
             />
 
+            {/* Delete Confirmation Dialog */}
             <AlertDialog
                 open={!!deletingCategory}
                 onOpenChange={(isOpen) => !isOpen && setDeletingCategory(undefined)}
