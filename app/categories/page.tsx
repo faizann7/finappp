@@ -38,6 +38,9 @@ export default function CategoriesPage() {
     const [loading, setLoading] = useState(true)
     const [deletingCategory, setDeletingCategory] = useState<Category | undefined>()
 
+    // State for Bulk Delete
+    const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([])
+
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY)
         if (stored) {
@@ -104,12 +107,23 @@ export default function CategoriesPage() {
 
     // Handle bulk deletion
     const handleBulkDelete = (categoryIds: string[]) => {
-        const updatedCategories = categories.filter(c => !categoryIds.includes(c.id))
-        saveCategories(updatedCategories)
-        toast({
-            title: "Success",
-            description: `${categoryIds.length} category(ies) have been deleted.`,
-        })
+        setBulkDeleteIds(categoryIds)
+    }
+
+    const confirmBulkDelete = () => {
+        if (bulkDeleteIds.length > 0) {
+            const updatedCategories = categories.filter(c => !bulkDeleteIds.includes(c.id))
+            saveCategories(updatedCategories)
+            toast({
+                title: "Success",
+                description: `${bulkDeleteIds.length} category(ies) have been deleted.`,
+            })
+            setBulkDeleteIds([])
+        }
+    }
+
+    const cancelBulkDelete = () => {
+        setBulkDeleteIds([])
     }
 
     return (
@@ -150,7 +164,7 @@ export default function CategoriesPage() {
                 onBulkDelete={handleBulkDelete}
             />
 
-            {/* Delete Confirmation Dialog */}
+            {/* Single Delete Confirmation Dialog */}
             <AlertDialog
                 open={!!deletingCategory}
                 onOpenChange={(isOpen) => !isOpen && setDeletingCategory(undefined)}
@@ -168,6 +182,36 @@ export default function CategoriesPage() {
                         </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDeleteConfirm}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Bulk Delete Confirmation Dialog */}
+            <AlertDialog
+                open={bulkDeleteIds.length > 0}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) {
+                        cancelBulkDelete()
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Selected Categories</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete {bulkDeleteIds.length} selected categor{bulkDeleteIds.length > 1 ? "ies" : "y"}? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={cancelBulkDelete}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmBulkDelete}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Delete
