@@ -29,9 +29,11 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, isBefore } from "date-fns"
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, addDays, isBefore, addMonths, endOfMonth as endOfMonthFns, startOfMonth as startOfMonthFns, addYears } from "date-fns"
 import { type Category } from "../categories/types"
 import { useEffect } from "react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { generateRecurringBudgets } from "../utils/budget-utils"
 
 const BUDGET_TYPE_OPTIONS = [
     { label: "Added Only", value: "added_only" },
@@ -42,17 +44,10 @@ const formSchema = z.object({
     name: z.string().min(1, "Budget name is required"),
     category: z.string().min(1, "Category is required"),
     amount: z.string().transform((val) => parseFloat(val)),
-    timeframe: z.enum(["weekly", "monthly", "yearly", "custom"]),
-    startDate: z.date().optional(),
-    endDate: z.date().optional(),
-}).refine((data) => {
-    if (data.startDate && data.endDate) {
-        return !isBefore(data.endDate, data.startDate)
-    }
-    return true
-}, {
-    message: "End date cannot be earlier than start date",
-    path: ["endDate"]
+    startDate: z.date(),
+    isRecurring: z.boolean().default(false),
+    numberOfMonths: z.number().min(1).max(12).optional(),
+    budgetType: z.enum(["added_only", "all_transactions"]).default("all_transactions"),
 })
 
 const TIMEFRAME_OPTIONS = [
@@ -96,50 +91,56 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
             name: budget.name,
             category: budget.category,
             amount: budget.amount.toString(),
-            timeframe: "custom",
-            startDate: budget.startDate ? new Date(budget.startDate) : undefined,
-            endDate: budget.endDate ? new Date(budget.endDate) : undefined,
+            startDate: budget.startDate ? new Date(budget.startDate) : new Date(),
+            isRecurring: false,
+            numberOfMonths: undefined,
+            budgetType: budget.budgetType,
         } : {
             name: "",
             category: "",
             amount: "0",
-            timeframe: "monthly",
-            startDate: startOfMonth(new Date()),
-            endDate: endOfMonth(new Date()),
+            startDate: new Date(),
+            isRecurring: false,
+            numberOfMonths: undefined,
+            budgetType: "all_transactions",
         },
     })
 
-    const timeframe = form.watch("timeframe")
-
-    useEffect(() => {
-        const today = new Date()
-
-        switch (timeframe) {
-            case "weekly":
-                form.setValue("startDate", today)
-                form.setValue("endDate", addDays(today, 7))
-                break
-            case "monthly":
-                form.setValue("startDate", startOfMonth(today))
-                form.setValue("endDate", endOfMonth(today))
-                break
-            case "yearly":
-                form.setValue("startDate", startOfYear(today))
-                form.setValue("endDate", endOfYear(today))
-                break
-        }
-    }, [timeframe, form])
-
     function handleSubmit(values: z.infer<typeof formSchema>) {
-        onSubmit({
-            id: budget?.id || crypto.randomUUID(),
-            name: values.name,
-            category: values.category,
-            amount: values.amount,
-            spent: budget?.spent || 0,
-            startDate: values.startDate?.toISOString(),
-            endDate: values.endDate?.toISOString(),
-        })
+        if (values.isRecurring && values.numberOfMonths) {
+            const templateBudget = {
+                id: budget?.id || crypto.randomUUID(),
+                name: values.name,
+                category: values.category,
+                amount: values.amount,
+                spent: 0,
+                budgetType: values.budgetType,
+            };
+
+            const recurringBudgets = generateRecurringBudgets(
+                templateBudget,
+                values.startDate,
+                values.numberOfMonths
+            );
+
+            onSubmit(recurringBudgets);
+        } else {
+            // Single budget
+            const endDate = values.isRecurring && values.numberOfMonths
+                ? addMonths(values.startDate, values.numberOfMonths)
+                : endOfMonth(values.startDate);
+
+            onSubmit({
+                id: budget?.id || crypto.randomUUID(),
+                name: values.name,
+                category: values.category,
+                amount: values.amount,
+                spent: budget?.spent || 0,
+                startDate: startOfMonth(values.startDate).toISOString(),
+                endDate: endDate.toISOString(),
+                budgetType: values.budgetType,
+            });
+        }
     }
 
     return (
@@ -152,11 +153,7 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                         <FormItem>
                             <FormLabel>Budget Name</FormLabel>
                             <FormControl>
-                                <Input
-                                    type="text"
-                                    placeholder="Enter budget name"
-                                    {...field}
-                                />
+                                <Input placeholder="Enter budget name" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -199,12 +196,7 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
                         <FormItem>
                             <FormLabel>Budget Amount</FormLabel>
                             <FormControl>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    {...field}
-                                />
+                                <Input type="number" step="0.01" {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -213,117 +205,80 @@ export function BudgetForm({ budget, categories, onSubmit, onCancel }: BudgetFor
 
                 <FormField
                     control={form.control}
-                    name="timeframe"
+                    name="startDate"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Timeframe</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select timeframe" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {TIMEFRAME_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <FormLabel>Start Date</FormLabel>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <FormControl>
+                                        <Button
+                                            variant="outline"
+                                            className={cn(
+                                                "w-full pl-3 text-left font-normal",
+                                                !field.value && "text-muted-foreground"
+                                            )}
+                                        >
+                                            {field.value ? (
+                                                format(field.value, "MMMM yyyy")
+                                            ) : (
+                                                <span>Pick a month</span>
+                                            )}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        mode="single"
+                                        selected={field.value}
+                                        onSelect={field.onChange}
+                                        disabled={(date) => date > addYears(new Date(), 1)}
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
                             <FormMessage />
                         </FormItem>
                     )}
                 />
 
-                {timeframe === "custom" && (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                            control={form.control}
-                            name="startDate"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Start Date</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full pl-3 text-left font-normal",
-                                                        !field.value && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {field.value ? (
-                                                        format(field.value, "PPP")
-                                                    ) : (
-                                                        <span>Pick a date</span>
-                                                    )}
-                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value}
-                                                onSelect={field.onChange}
-                                                disabled={(date) =>
-                                                    date < new Date("1900-01-01") ||
-                                                    (form.getValues("startDate") && isBefore(date, form.getValues("startDate")))
-                                                }
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                <FormField
+                    control={form.control}
+                    name="isRecurring"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                                <Checkbox
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                />
+                            </FormControl>
+                            <FormLabel>Create recurring budget</FormLabel>
+                        </FormItem>
+                    )}
+                />
 
-                        <FormField
-                            control={form.control}
-                            name="endDate"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>End Date</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <FormControl>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full pl-3 text-left font-normal",
-                                                        !field.value && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {field.value ? (
-                                                        format(field.value, "PPP")
-                                                    ) : (
-                                                        <span>Pick a date</span>
-                                                    )}
-                                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                </Button>
-                                            </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value}
-                                                onSelect={field.onChange}
-                                                disabled={(date) =>
-                                                    date < new Date("1900-01-01") ||
-                                                    (form.getValues("startDate") && isBefore(date, form.getValues("startDate")))
-                                                }
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                {form.watch("isRecurring") && (
+                    <FormField
+                        control={form.control}
+                        name="numberOfMonths"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of Months</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        max="12"
+                                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                        value={field.value}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                 )}
 
                 <div className="flex justify-end gap-4">

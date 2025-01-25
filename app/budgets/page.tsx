@@ -41,18 +41,23 @@ export default function BudgetsPage() {
         localStorage.setItem(STORAGE_KEY_BUDGETS, JSON.stringify(newBudgets))
     }
 
-    const handleSubmit = (budget: Budget) => {
-        if (editingBudget) {
-            saveBudgets(
-                budgets.map((b) => (b.id === budget.id ? budget : b))
-            )
-            setSuccessMessage(`${budget.name} has been updated successfully.`)
+    const handleSubmit = (budgetData: Budget | Budget[]) => {
+        if (Array.isArray(budgetData)) {
+            // Handle recurring budgets
+            saveBudgets([...budgets, ...budgetData]);
+            setSuccessMessage(`Created ${budgetData.length} recurring budgets`);
         } else {
-            saveBudgets([...budgets, budget])
-            setSuccessMessage(`${budget.name} has been created successfully.`)
+            // Handle single budget
+            if (editingBudget) {
+                saveBudgets(budgets.map((b) => (b.id === budgetData.id ? budgetData : b)));
+                setSuccessMessage(`${budgetData.name} has been updated successfully.`);
+            } else {
+                saveBudgets([...budgets, budgetData]);
+                setSuccessMessage(`${budgetData.name} has been created successfully.`);
+            }
         }
-        setShowSuccess(true)
-        handleClose()
+        setShowSuccess(true);
+        handleClose();
 
         // Auto-dismiss the success message after 2 seconds
         setTimeout(() => {
@@ -65,18 +70,26 @@ export default function BudgetsPage() {
         setIsFormOpen(true)
     }
 
-    const handleDelete = (budgetId: string) => {
-        const budgetToDelete = budgets.find(b => b.id === budgetId)
-        if (budgetToDelete) {
-            saveBudgets(budgets.filter((b) => b.id !== budgetId))
-            setSuccessMessage(`${budgetToDelete.name} has been deleted.`)
-            setShowSuccess(true)
-
-            // Auto-dismiss the success message after 2 seconds
-            setTimeout(() => {
-                setShowSuccess(false)
-            }, 2000);
+    const handleDelete = (budgetId: string | string[]) => {
+        if (Array.isArray(budgetId)) {
+            // Handle bulk delete
+            const budgetsToDelete = budgets.filter(b => budgetId.includes(b.id))
+            const remainingBudgets = budgets.filter(b => !budgetId.includes(b.id))
+            saveBudgets(remainingBudgets)
+            setSuccessMessage(`${budgetId.length} budgets have been deleted.`)
+        } else {
+            // Handle single delete
+            const budgetToDelete = budgets.find(b => b.id === budgetId)
+            if (budgetToDelete) {
+                saveBudgets(budgets.filter((b) => b.id !== budgetId))
+                setSuccessMessage(`${budgetToDelete.name} has been deleted.`)
+            }
         }
+        setShowSuccess(true)
+
+        setTimeout(() => {
+            setShowSuccess(false)
+        }, 2000)
     }
 
     const handleClose = () => {
